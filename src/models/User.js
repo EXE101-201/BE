@@ -35,6 +35,21 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  isPremium: {
+    type: Boolean,
+    default: false,
+  },
+  premiumUntil: {
+    type: Date,
+    default: null,
+  },
+  anonymous: {
+    name: { type: String, default: null },
+    id: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: () => new mongoose.Types.ObjectId()
+    },
+  },
 }, {
   timestamps: false,
 });

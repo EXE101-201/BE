@@ -78,6 +78,9 @@ export const googleLogin = async (req, res) => {
                     fullName: user.fullName,
                     email: user.email,
                     role: user.role,
+                    isPremium: user.isPremium || false,
+                    premiumUntil: user.premiumUntil || null,
+                    anonymous: user.anonymous,
                 },
             });
         } else {
@@ -112,6 +115,9 @@ export const googleLogin = async (req, res) => {
                     fullName: newUser.fullName,
                     email: newUser.email,
                     role: newUser.role,
+                    isPremium: newUser.isPremium || false,
+                    premiumUntil: newUser.premiumUntil || null,
+                    anonymous: newUser.anonymous,
                 },
             });
         }
@@ -162,6 +168,9 @@ export const register = async (req, res) => {
                 fullName: newUser.fullName,
                 email: newUser.email,
                 role: newUser.role,
+                isPremium: newUser.isPremium || false,
+                premiumUntil: newUser.premiumUntil || null,
+                anonymous: newUser.anonymous,
             },
         });
     } catch (error) {
@@ -201,6 +210,9 @@ export const login = async (req, res) => {
                 fullName: user.fullName,
                 email: user.email,
                 role: user.role,
+                isPremium: user.isPremium || false,
+                premiumUntil: user.premiumUntil || null,
+                anonymous: user.anonymous,
             },
         });
     } catch (error) {

@@ -4,6 +4,7 @@ import contentRoutes from './content.routes.js';
 import userRoutes from './user.routes.js';
 import adminRoutes from './admin.routes.js';
 import confessionRoutes from './confession.routes.js';
+import chatbotRoutes from './chatbot.routes.js';
 import { protect } from '../middleware/auth.js';
 
 import articleRoutes from './article.routes.js';
@@ -16,7 +17,8 @@ router.use('/content', protect, contentRoutes);
 router.use('/articles', articleRoutes);
 router.use('/users', protect, userRoutes);
 router.use('/admin', protect, adminRoutes);
-router.use('/confessions', protect, confessionRoutes);
+router.use('/confessions', confessionRoutes); // Allow public access for confessions
+router.use('/chatbot', chatbotRoutes);
 
 
 export default router;

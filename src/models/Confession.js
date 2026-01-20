@@ -4,7 +4,12 @@ const confessionSchema = new mongoose.Schema({
     content: {
         type: String,
         required: true,
+        maxlength: 500, // Limit content length
     },
+    tags: [{
+        type: String,
+        enum: ['stress', 'học_tập', 'mối_quan_hệ', 'gia_đình'], // Predefined tags
+    }],
     author: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

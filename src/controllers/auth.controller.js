@@ -148,7 +148,7 @@ export const register = async (req, res) => {
             fullName,
             email,
             password: hashedPassword,
-            role: role || 'STUDENT', // Default to STUDENT if not provided
+            role: role || 'USER', // Default to USER to match schema
         });
 
         await newUser.save();

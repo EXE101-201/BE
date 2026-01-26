@@ -8,7 +8,6 @@ const confessionSchema = new mongoose.Schema({
     },
     tags: [{
         type: String,
-        enum: ['stress', 'học_tập', 'mối_quan_hệ', 'gia_đình'], // Predefined tags
     }],
     author: {
         type: mongoose.Schema.Types.ObjectId,
@@ -22,8 +21,15 @@ const confessionSchema = new mongoose.Schema({
     },
     reactions: {
         type: Map,
-        of: Number,
+        of: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        }],
         default: {},
+    },
+    isPremium: {
+        type: Boolean,
+        default: false,
     },
     createdAt: {
         type: Date,

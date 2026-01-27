@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
-const DB_NAME = process.env.DB_NAME || 'banglaixe';
+const DB_NAME = process.env.DB_NAME || 'EXE201';
 
 /**
  * Kết nối đến MongoDB Atlas bằng Mongoose

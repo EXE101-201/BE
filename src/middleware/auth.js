@@ -44,3 +44,13 @@ export const admin = async (req, res, next) => {
         res.status(403);
     }
 };
+export const transaction = async (req, res, next) => {
+    const auth = req.headers.authorization;
+    const result = auth.replace('Apikey ', '');
+    console.log(result);
+    if (result === process.env.TRANSACTION_SECRET) {
+        next();
+    } else {
+        res.status(403);
+    }
+};

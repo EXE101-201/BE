@@ -118,7 +118,7 @@ export const getApprovedConfessions = async (req, res) => {
                                     if: {
                                         $or: [
                                             { $eq: ['$isAnonymous', false] },
-                                            { $eq: ['$$role', 'admin'] },
+                                            { $eq: ['$$role', 'ADMIN'] },
                                             { $eq: ['$$userId', '$author'] }
                                         ]
                                     },
@@ -130,7 +130,7 @@ export const getApprovedConfessions = async (req, res) => {
                     },
                     isOwner: {
                         $let: {
-                            vars: { userId: req.user ? { $toString: req.user._id } : null },
+                            vars: { userId: req.user ? req.user._id.toString() : null },
                             in: {
                                 $and: [
                                     { $ne: ['$$userId', null] },
@@ -254,7 +254,7 @@ export const getConfessionById = async (req, res) => {
                     },
                     isOwner: {
                         $let: {
-                            vars: { userId: req.user ? { $toString: req.user._id } : null },
+                            vars: { userId: req.user ? req.user._id.toString() : null },
                             in: {
                                 $and: [
                                     { $ne: ['$$userId', null] },
@@ -320,6 +320,12 @@ export const addReaction = async (req, res) => {
         const confession = await Confession.findById(id);
         if (!confession) return res.status(404).json({ message: 'Không tìm thấy confession' });
 
+        if (!confession.reactions || !(confession.reactions instanceof Map)) {
+            // If it's a POJO from old data, convert to Map, otherwise new Map
+            const initialData = confession.reactions && typeof confession.reactions === 'object' ? Object.entries(confession.reactions) : [];
+            confession.reactions = new Map(initialData);
+        }
+
         if (!confession.reactions.has(emoji)) {
             confession.reactions.set(emoji, []);
         }
@@ -343,8 +349,14 @@ export const addReaction = async (req, res) => {
 
         // Convert Map to plain object with counts for response
         const counts = {};
-        for (let [key, value] of confession.reactions) {
-            counts[key] = value.length;
+        if (confession.reactions instanceof Map) {
+            for (let [key, value] of confession.reactions) {
+                counts[key] = Array.isArray(value) ? value.length : 0;
+            }
+        } else if (typeof confession.reactions === 'object' && confession.reactions !== null) {
+            for (let key in confession.reactions) {
+                counts[key] = Array.isArray(confession.reactions[key]) ? confession.reactions[key].length : 0;
+            }
         }
 
         res.json({ message: index > -1 ? 'Reaction removed' : 'Reaction added', reactions: counts });

@@ -14,6 +14,10 @@ const confessionSchema = new mongoose.Schema({
         ref: 'User',
         default: null, // Can be anonymous
     },
+    isAnonymous: {
+        type: Boolean,
+        default: false,
+    },
     status: {
         type: String,
         enum: ['pending', 'approved', 'rejected'],

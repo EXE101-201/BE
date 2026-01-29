@@ -35,6 +35,27 @@ export const protect = async (req, res, next) => {
     }
 };
 
+export const optionalProtect = async (req, res, next) => {
+    let token;
+
+    if (
+        req.headers.authorization &&
+        req.headers.authorization.startsWith('Bearer')
+    ) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key');
+            req.user = await User.findById(decoded.id).select('-password');
+            next();
+        } catch (error) {
+            // Ignore error and continue as anonymous
+            next();
+        }
+    } else {
+        next();
+    }
+};
+
 export const admin = async (req, res, next) => {
     const userEmail = req.user.email;
     let user = await User.findOne({ userEmail });

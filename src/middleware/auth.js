@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-export const protect = async (req, res, next) => {
+export async function protect(req, res, next) {
     let token;
 
     if (
@@ -9,69 +9,61 @@ export const protect = async (req, res, next) => {
         req.headers.authorization.startsWith('Bearer')
     ) {
         try {
-            // Get token from header
             token = req.headers.authorization.split(' ')[1];
-
-            // Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key');
-
-            // Get user from the token
             req.user = await User.findById(decoded.id).select('-password');
 
             if (!req.user) {
-                console.error('User not found for token id:', decoded.id);
                 return res.status(401).json({ message: 'User not found' });
             }
 
-            next();
+            return next();
         } catch (error) {
-            console.error('Auth Middleware Error:', error.message);
-            res.status(401).json({ message: 'Không được phép, token không hợp lệ' });
+            return res.status(401).json({ message: 'Không được phép, token không hợp lệ' });
         }
     }
 
     if (!token) {
-        res.status(401).json({ message: 'Không được phép, không có token' });
+        return res.status(401).json({ message: 'Không được phép, không có token' });
     }
-};
+}
 
-export const optionalProtect = async (req, res, next) => {
-    let token;
-
+export async function optionalProtect(req, res, next) {
     if (
         req.headers.authorization &&
         req.headers.authorization.startsWith('Bearer')
     ) {
         try {
-            token = req.headers.authorization.split(' ')[1];
+            const token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key');
             req.user = await User.findById(decoded.id).select('-password');
-            next();
+            return next();
         } catch (error) {
-            // Ignore error and continue as anonymous
-            next();
+            return next();
         }
-    } else {
-        next();
     }
-};
+    return next();
+}
 
-export const admin = async (req, res, next) => {
-    const userEmail = req.user.email;
-    let user = await User.findOne({ userEmail });
-    if (user && user.role === 'ADMIN') {
-        next();
-    } else {
-        res.status(403);
+export async function admin(req, res, next) {
+    if (!req.user) {
+        return res.status(401).json({ message: 'Không được phép' });
     }
-};
-export const transaction = async (req, res, next) => {
+    if (req.user.role === 'ADMIN') {
+        return next();
+    }
+    return res.status(403).json({ message: 'Quyền admin yêu cầu' });
+}
+
+export async function transaction(req, res, next) {
     const auth = req.headers.authorization;
-    const result = auth.replace('Apikey ', '');
-    console.log(result);
-    if (result === process.env.TRANSACTION_SECRET) {
-        next();
-    } else {
-        res.status(403);
+    if (!auth) {
+        return res.status(403).json({ message: 'Forbidden' });
     }
-};
+    const result = auth.replace('Apikey ', '');
+    if (result === process.env.TRANSACTION_SECRET) {
+        return next();
+    }
+    return res.status(403).json({ message: 'Forbidden' });
+}
+

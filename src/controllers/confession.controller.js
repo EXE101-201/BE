@@ -20,13 +20,15 @@ export const createConfession = async (req, res) => {
                 .slice(0, 5);
         }
 
-        // Set author based on anonymous flag
-        const author = anonymous ? null : (req.user ? req.user._id : null);
+        // Always store author if logged in, but use isAnonymous to control visibility
+        const author = req.user ? req.user._id : null;
+        const isAnonymous = anonymous === true;
 
         const newConfession = new Confession({
             content,
             tags: processedTags,
-            author: author,
+            author,
+            isAnonymous,
             status: 'approved'
         });
         await newConfession.save();
@@ -58,18 +60,12 @@ export const getApprovedConfessions = async (req, res) => {
                 $addFields: {
                     authorName: {
                         $cond: {
-                            if: { $or: [{ $eq: ['$author', null] }, { $eq: [{ $size: '$user' }, 0] }] },
+                            if: { $or: [{ $eq: ['$isAnonymous', true] }, { $eq: ['$author', null] }, { $eq: [{ $size: '$user' }, 0] }] },
                             then: 'Anonymous',
                             else: { $arrayElemAt: ['$user.fullName', 0] }
                         }
                     },
-                    authorId: {
-                        $cond: {
-                            if: { $or: [{ $eq: ['$author', null] }, { $eq: [{ $size: '$user' }, 0] }] },
-                            then: null,
-                            else: { $arrayElemAt: ['$user._id', 0] }
-                        }
-                    }
+                    authorId: { $ifNull: ['$author', null] }
                 }
             },
             {
@@ -111,9 +107,66 @@ export const getApprovedConfessions = async (req, res) => {
                     isPremium: 1,
                     createdAt: 1,
                     author: '$authorName',
-                    authorId: 1,
+                    authorId: {
+                        $let: {
+                            vars: {
+                                userId: req.user ? req.user._id : null,
+                                role: req.user ? req.user.role : null
+                            },
+                            in: {
+                                $cond: {
+                                    if: {
+                                        $or: [
+                                            { $eq: ['$isAnonymous', false] },
+                                            { $eq: ['$$role', 'admin'] },
+                                            { $eq: ['$$userId', '$author'] }
+                                        ]
+                                    },
+                                    then: { $ifNull: ['$author', null] },
+                                    else: null
+                                }
+                            }
+                        }
+                    },
+                    isOwner: {
+                        $let: {
+                            vars: { userId: req.user ? { $toString: req.user._id } : null },
+                            in: {
+                                $and: [
+                                    { $ne: ['$$userId', null] },
+                                    { $eq: ['$$userId', { $toString: '$author' }] }
+                                ]
+                            }
+                        }
+                    },
                     commentCount: 1,
-                    id: '$_id'
+                    id: '$_id',
+                    myReaction: {
+                        $let: {
+                            vars: {
+                                reactionsArray: { $objectToArray: { $ifNull: ['$reactions', {}] } },
+                                userId: req.user ? req.user._id : null
+                            },
+                            in: {
+                                $reduce: {
+                                    input: '$$reactionsArray',
+                                    initialValue: null,
+                                    in: {
+                                        $cond: [
+                                            {
+                                                $and: [
+                                                    { $isArray: '$$this.v' },
+                                                    { $in: ['$$userId', '$$this.v'] }
+                                                ]
+                                            },
+                                            '$$this.k',
+                                            '$$value'
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             },
             { $sort: { isPremium: -1, createdAt: -1 } }
@@ -144,18 +197,12 @@ export const getConfessionById = async (req, res) => {
                 $addFields: {
                     authorName: {
                         $cond: {
-                            if: { $or: [{ $eq: ['$author', null] }, { $eq: [{ $size: '$user' }, 0] }] },
+                            if: { $or: [{ $eq: ['$isAnonymous', true] }, { $eq: ['$author', null] }, { $eq: [{ $size: '$user' }, 0] }] },
                             then: 'Anonymous',
                             else: { $arrayElemAt: ['$user.fullName', 0] }
                         }
                     },
-                    authorId: {
-                        $cond: {
-                            if: { $or: [{ $eq: ['$author', null] }, { $eq: [{ $size: '$user' }, 0] }] },
-                            then: null,
-                            else: { $arrayElemAt: ['$user._id', 0] }
-                        }
-                    }
+                    authorId: { $ifNull: ['$author', null] }
                 }
             },
             {
@@ -184,8 +231,65 @@ export const getConfessionById = async (req, res) => {
                     isPremium: 1,
                     createdAt: 1,
                     author: '$authorName',
-                    authorId: 1,
-                    id: '$_id'
+                    authorId: {
+                        $let: {
+                            vars: {
+                                userId: req.user ? req.user._id : null,
+                                role: req.user ? req.user.role : null
+                            },
+                            in: {
+                                $cond: {
+                                    if: {
+                                        $or: [
+                                            { $eq: ['$isAnonymous', false] },
+                                            { $eq: ['$$role', 'admin'] },
+                                            { $eq: ['$$userId', '$author'] }
+                                        ]
+                                    },
+                                    then: { $ifNull: ['$author', null] },
+                                    else: null
+                                }
+                            }
+                        }
+                    },
+                    isOwner: {
+                        $let: {
+                            vars: { userId: req.user ? { $toString: req.user._id } : null },
+                            in: {
+                                $and: [
+                                    { $ne: ['$$userId', null] },
+                                    { $eq: ['$$userId', { $toString: '$author' }] }
+                                ]
+                            }
+                        }
+                    },
+                    id: '$_id',
+                    myReaction: {
+                        $let: {
+                            vars: {
+                                reactionsArray: { $objectToArray: { $ifNull: ['$reactions', {}] } },
+                                userId: req.user ? req.user._id : null
+                            },
+                            in: {
+                                $reduce: {
+                                    input: '$$reactionsArray',
+                                    initialValue: null,
+                                    in: {
+                                        $cond: [
+                                            {
+                                                $and: [
+                                                    { $isArray: '$$this.v' },
+                                                    { $in: ['$$userId', '$$this.v'] }
+                                                ]
+                                            },
+                                            '$$this.k',
+                                            '$$value'
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         ]);
@@ -250,6 +354,16 @@ export const addReaction = async (req, res) => {
     }
 };
 
+export const getTags = async (req, res) => {
+    try {
+        const tags = await Confession.distinct('tags', { status: 'approved' });
+        res.json(tags);
+    } catch (error) {
+        console.error('Error fetching tags:', error);
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
 export const deleteConfession = async (req, res) => {
     try {
         const { id } = req.params;
@@ -260,7 +374,10 @@ export const deleteConfession = async (req, res) => {
             return res.status(404).json({ message: 'Confession không tồn tại' });
         }
 
-        if (!confession.author || confession.author.toString() !== userId.toString()) {
+        const isAdmin = req.user.role === 'admin';
+        const isAuthor = confession.author && confession.author.toString() === userId.toString();
+
+        if (!isAuthor && !isAdmin) {
             return res.status(403).json({ message: 'Không có quyền xóa confession này' });
         }
 

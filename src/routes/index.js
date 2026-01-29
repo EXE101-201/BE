@@ -5,8 +5,8 @@ import userRoutes from './user.routes.js';
 import adminRoutes from './admin.routes.js';
 import confessionRoutes from './confession.routes.js';
 import chatbotRoutes from './chatbot.routes.js';
-import { protect } from '../middleware/auth.js';
-
+import { protect, transaction } from '../middleware/auth.js';
+import transactionRoutes from './transaction.routes.js';
 import articleRoutes from './article.routes.js';
 const router = express.Router();
 
@@ -17,8 +17,10 @@ router.use('/content', protect, contentRoutes);
 router.use('/articles', articleRoutes);
 router.use('/users', protect, userRoutes);
 router.use('/admin', protect, adminRoutes);
-router.use('/confessions', confessionRoutes); // Allow public access for confessions
+router.use('/confessions', confessionRoutes);
 router.use('/chatbot', chatbotRoutes);
+
+router.use('/transactions', transactionRoutes);
 
 
 export default router;

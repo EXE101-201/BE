@@ -25,10 +25,6 @@ export const upgradePremium = async (req, res) => {
 
             user.isPremium = true;
             user.premiumUntil = premiumUntil;
-        } else {
-            // Downgrade to basic
-            user.isPremium = false;
-            user.premiumUntil = null;
         }
 
         await user.save();
@@ -91,5 +87,54 @@ export const getMe = async (req, res) => {
         res.json(user);
     } catch (error) {
         res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
+export const activateTrial = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ message: 'Người dùng không tồn tại' });
+        }
+
+        if (user.hasUsedTrial) {
+            return res.status(400).json({ message: 'Bạn đã sử dụng gói dùng thử miễn phí rồi.' });
+        }
+
+        const now = new Date();
+        let premiumUntil;
+
+        if (user.isPremium && user.premiumUntil && new Date(user.premiumUntil) > now) {
+            // Extend existing
+            premiumUntil = new Date(user.premiumUntil);
+            premiumUntil.setDate(premiumUntil.getDate() + 7);
+        } else {
+            // New trial
+            premiumUntil = new Date(now);
+            premiumUntil.setDate(premiumUntil.getDate() + 7);
+        }
+
+        user.isPremium = true;
+        user.premiumUntil = premiumUntil;
+        user.hasUsedTrial = true;
+
+        await user.save();
+
+        res.json({
+            message: 'Kích hoạt gói dùng thử 7 ngày thành công!',
+            user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                role: user.role,
+                isPremium: user.isPremium,
+                premiumUntil: user.premiumUntil,
+                hasUsedTrial: user.hasUsedTrial
+            }
+        });
+
+    } catch (error) {
+        console.error('Activate Trial Error:', error);
+        res.status(500).json({ message: 'Lỗi server khi kích hoạt dùng thử' });
     }
 };

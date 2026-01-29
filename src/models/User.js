@@ -50,6 +50,10 @@ const userSchema = new mongoose.Schema({
       default: () => new mongoose.Types.ObjectId()
     },
   },
+  hasUsedTrial: {
+    type: Boolean,
+    default: false,
+  },
 }, {
   timestamps: false,
 });

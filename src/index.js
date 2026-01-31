@@ -15,7 +15,9 @@ app.use(morgan('dev'))
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
 })
-
+app.get('/ping', (req, res) => {
+  res.status(200).send('Server is alive!');
+});
 app.use('/api', apiRoutes);
 
 const PORT = Number(process.env.PORT || 4000)

@@ -12,6 +12,10 @@ const contentSchema = new mongoose.Schema({
         enum: ['ARTICLE', 'MUSIC', 'MEDITATION'],
         required: true,
     },
+    category: {
+        type: String,
+        required: true,
+    },
     summary: {
         type: String, // For articles describes content, for audio describes track
         trim: true,

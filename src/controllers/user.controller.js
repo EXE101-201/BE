@@ -84,7 +84,19 @@ export const updateProfile = async (req, res) => {
 export const getMe = async (req, res) => {
     try {
         const user = await User.findById(req.user._id).select('-password');
-        res.json(user);
+        if (!user) {
+            return res.status(404).json({ message: 'Người dùng không tồn tại' });
+        }
+        res.json({
+            id: user._id,
+            fullName: user.fullName,
+            email: user.email,
+            role: user.role,
+            isPremium: user.isPremium,
+            premiumUntil: user.premiumUntil,
+            anonymous: user.anonymous,
+            hasUsedTrial: user.hasUsedTrial
+        });
     } catch (error) {
         res.status(500).json({ message: 'Lỗi server' });
     }

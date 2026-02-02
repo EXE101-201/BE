@@ -9,11 +9,17 @@ const aIUserSchema = new mongoose.Schema({
   messages: [{
     role: {
       type: String,
+      enum: ['user', 'assistant'],
       required: true,
     },
     content: {
       type: String,
       required: true,
+    },
+    expression: {
+      type: String,
+      enum: ['neutral', 'happy', 'empathetic', 'thinking', 'surprised', 'sad'],
+      default: 'neutral',
     },
     timestamp: {
       type: Date,

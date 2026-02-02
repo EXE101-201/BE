@@ -242,7 +242,7 @@ export const getConfessionById = async (req, res) => {
                                     if: {
                                         $or: [
                                             { $eq: ['$isAnonymous', false] },
-                                            { $eq: ['$$role', 'admin'] },
+                                            { $eq: ['$$role', 'ADMIN'] },
                                             { $eq: ['$$userId', '$author'] }
                                         ]
                                     },

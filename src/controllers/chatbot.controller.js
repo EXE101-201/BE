@@ -5,7 +5,25 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
-    systemInstruction: 'You are a supportive chatbot. Always respond in a positive, encouraging, and empathetic manner.',
+    systemInstruction: `You are a supportive, empathetic, and encouraging chatbot for a mental health platform called "Stu.Mental Health".
+
+CONTEXTUAL AWARENESS:
+- You MUST remember previous details the user shared. 
+- Refer back to earlier statements to show you are listening.
+- Maintain continuity in your support.
+
+RESPONSE FORMAT:
+Your response MUST be in JSON format with two fields: "content" and "expression".
+
+EMOTIONAL GUIDELINES:
+- "happy": USE THIS when the user says they feel better, share a win, or thank you warmly. Be visibly joyful for their progress!
+- "sad": Use when they share deep pain or loss.
+- "empathetic": Your standard mode for listening and validating.
+- "surprised": For unexpected breakthroughs.
+- "thinking": For deep analysis.
+- "neutral": For facts, nothing more.
+
+CRITICAL: Do NOT include any text outside the JSON block. Return ONLY the JSON.`,
 });
 
 // Get available topics
@@ -55,7 +73,7 @@ export const sendMessage = async (req, res) => {
             aiUser = new AIUser({ user: userId, messages: [] });
         }
 
-        // Check daily limit (10 messages per day for free users)
+        // Check daily limit (50 messages per day)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
@@ -69,9 +87,8 @@ export const sendMessage = async (req, res) => {
         // Add user message to history
         aiUser.messages.push({ role: 'user', content: message, timestamp: new Date() });
 
-        // Prepare history for Gemini (exclude the current user message)
+        // Prepare history for Gemini
         let historyMessages = aiUser.messages.slice(0, -1);
-
         // Sanitize history: Ensure it doesn't end with a user message (which would cause user -> user sequence)
         // If the last message in history is 'user', it means the previous response failed or was not saved.
         // We remove it to maintain the user -> model -> user flow.
@@ -89,15 +106,56 @@ export const sendMessage = async (req, res) => {
 
         // Send the user message to get response
         const result = await chat.sendMessage(message);
-        const response = result.response.text();
+        let responseRaw = result.response.text();
+        console.log('--- RAW GEMINI RESPONSE ---');
+        console.log(responseRaw);
+        console.log('---------------------------');
+
+        // Robust JSON extraction
+        let parsedResponse;
+        try {
+            // Find the first { and last } to extract JSON if there's noise
+            const jsonMatch = responseRaw.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const jsonStr = jsonMatch[jsonMatch.length - 1]; // Take the last match if there are multiple
+                parsedResponse = JSON.parse(jsonStr);
+            } else {
+                throw new Error('No JSON found');
+            }
+        } catch (e) {
+            console.error('Failed to parse Gemini response:', e.message);
+            // Fallback: clean up common markdown noise
+            let cleanResponse = responseRaw.replace(/```json|```/g, '').trim();
+            try {
+                parsedResponse = JSON.parse(cleanResponse);
+            } catch (e2) {
+                console.error('Final fallback triggered for expression');
+                // Heuristic-based detection if JSON fails
+                let detectedExpression = 'neutral';
+                const lowerMsg = responseRaw.toLowerCase();
+                if (lowerMsg.includes('vui') || lowerMsg.includes('tuyệt') || lowerMsg.includes('mừng')) detectedExpression = 'happy';
+                else if (lowerMsg.includes('buồn') || lowerMsg.includes('tệ') || lowerMsg.includes('khóc')) detectedExpression = 'sad';
+                else if (lowerMsg.includes('hiểu') || lowerMsg.includes('chia sẻ')) detectedExpression = 'empathetic';
+
+                parsedResponse = { content: responseRaw, expression: detectedExpression };
+            }
+        }
 
         // Add assistant response to history
-        aiUser.messages.push({ role: 'assistant', content: response, timestamp: new Date() });
+        aiUser.messages.push({
+            role: 'assistant',
+            content: parsedResponse.content || responseRaw,
+            expression: parsedResponse.expression || 'neutral',
+            timestamp: new Date()
+        });
 
         // Save to database
         await aiUser.save();
 
-        res.json({ response });
+        res.json({
+            response: parsedResponse.content || responseRaw,
+            expression: parsedResponse.expression || 'neutral'
+        });
     } catch (error) {
         console.error('Error in sendMessage:', error);
         res.status(500).json({ message: 'Lỗi server' });

@@ -8,6 +8,7 @@ import chatbotRoutes from './chatbot.routes.js';
 import { protect, transaction } from '../middleware/auth.js';
 import transactionRoutes from './transaction.routes.js';
 import articleRoutes from './article.routes.js';
+import challengeRoutes from './challenge.routes.js';
 const router = express.Router();
 
 // Auth routes (no prefix)
@@ -19,6 +20,7 @@ router.use('/users', protect, userRoutes);
 router.use('/admin', protect, adminRoutes);
 router.use('/confessions', confessionRoutes);
 router.use('/chatbot', chatbotRoutes);
+router.use('/challenges', challengeRoutes);
 
 router.use('/transactions', transactionRoutes);
 

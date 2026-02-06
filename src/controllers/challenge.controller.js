@@ -95,3 +95,32 @@ export const updateProgress = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const getChallengeById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const challenge = await Challenge.findById(id);
+
+        if (!challenge) {
+            return res.status(404).json({ message: 'Không tìm thấy thử thách.' });
+        }
+
+        let userProgress = null;
+        if (req.user) {
+            const userChallenge = await UserChallenge.findOne({ userId: req.user._id, challengeId: id });
+            if (userChallenge) {
+                userProgress = {
+                    status: userChallenge.status,
+                    progress: userChallenge.progress,
+                    lastUpdated: userChallenge.lastUpdated
+                };
+            }
+        }
+        res.json({
+            ...challenge.toObject(),
+            userProgress
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

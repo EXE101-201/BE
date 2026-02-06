@@ -43,7 +43,7 @@ export const joinChallenge = async (req, res) => {
             challengeId,
             status: 'JOINED',
             progress: 0,
-            lastUpdated: new Date()
+            lastUpdated: null
         });
 
         await newUserChallenge.save();

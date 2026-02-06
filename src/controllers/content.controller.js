@@ -61,3 +61,12 @@ export const createContent = async (req, res) => {
         res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
     }
 };
+
+export const incrementViewCount = async (req, res) => {
+    try {
+        await Content.findByIdAndUpdate(req.params.id, { $inc: { viewCount: 1 } });
+        res.status(200).json({ message: 'View count incremented' });
+    } catch (error) {
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};

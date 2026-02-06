@@ -39,6 +39,10 @@ const contentSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now,
+    },
+    viewCount: {
+        type: Number,
+        default: 0,
     }
 });
 

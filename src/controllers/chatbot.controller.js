@@ -62,7 +62,6 @@ export const startChat = async (req, res) => {
     }
 };
 
-// Send message using Gemini AI
 export const sendMessage = async (req, res) => {
     try {
         const { message } = req.body;
@@ -89,9 +88,6 @@ export const sendMessage = async (req, res) => {
 
         // Prepare history for Gemini
         let historyMessages = aiUser.messages.slice(0, -1);
-        // Sanitize history: Ensure it doesn't end with a user message (which would cause user -> user sequence)
-        // If the last message in history is 'user', it means the previous response failed or was not saved.
-        // We remove it to maintain the user -> model -> user flow.
         if (historyMessages.length > 0 && historyMessages[historyMessages.length - 1].role === 'user') {
             historyMessages.pop();
         }
@@ -101,8 +97,59 @@ export const sendMessage = async (req, res) => {
             parts: [{ text: m.content }],
         }));
 
-        // Start chat with history
-        const chat = model.startChat({ history });
+        // Dynamically build system instruction based on user premium status
+        let baseInstruction = `You are a supportive, empathetic, and encouraging chatbot for a mental health platform called "Stu.Mental Health".
+
+CONTEXTUAL AWARENESS:
+- You MUST remember previous details the user shared.
+- Refer back to earlier statements to show you are listening.
+- Maintain continuity in your support.
+
+RESPONSE STYLE (CRITICAL):
+- Answer intelligently but CONCISELY (1 cách thông minh và ngắn gọn hơn).
+- Keep your answers brief, around 2-3 sentences max unless explaining a complex topic.
+
+RESPONSE FORMAT:
+Your response MUST be in strictly valid JSON format exactly like this: {"content": "your response here", "expression": "neutral"}
+
+EMOTIONAL GUIDELINES:
+- "happy": USE THIS when the user says they feel better, share a win, or thank you warmly. Be visibly joyful for their progress!
+- "sad": Use when they share deep pain or loss.
+- "empathetic": Your standard mode for listening and validating.
+- "surprised": For unexpected breakthroughs.
+- "thinking": For deep analysis.
+- "neutral": For facts, nothing more.
+
+CRITICAL: Do NOT include any text outside the JSON block. Return ONLY the JSON.`;
+
+        // Wait to import Activity dynamically or ensure it's imported at the top. It's not imported at the top, so let's import it here.
+        const Activity = (await import('../models/Activity.js')).default;
+
+        if (req.user.isPremium) {
+            // Fetch recent activities for premium user
+            const recentActivities = await Activity.find({ userId: userId }).sort({ createdAt: -1 }).limit(10);
+            const activityDescriptions = recentActivities.map(a => {
+                if (a.type === 'AI_CHAT') return `Đã chat với AI lúc ${a.createdAt.toLocaleTimeString()}`;
+                if (a.type === 'LOGIN') return `Đăng nhập lúc ${a.createdAt.toLocaleTimeString()}`;
+                if (a.type === 'USAGE_TIME') return `Sử dụng ${a.value} phút lúc ${a.createdAt.toLocaleTimeString()}`;
+                return a.type;
+            }).join(', ');
+
+            baseInstruction += `\n\nPREMIUM USER CONTEXT (Hoạt động thời gian thực):
+Người dùng này đang dùng gói Premium (49k). Dưới đây là các hoạt động gần đây của họ trên trang web của chúng ta: [ ${activityDescriptions || 'Chưa có hoạt động đáng kể'} ].
+Dựa vào dữ liệu này, hãy:
+- Quan sát cảm xúc của họ và có khả năng liệt kê lại những gì họ đã làm nếu họ hỏi.
+- Chủ động gợi ý họ sử dụng các tính năng của trang web (như: Hỗ trợ viết bài confession để tâm trạng tốt hơn, tìm nhạc thư giãn, tìm bài tập).
+- Chỉ rõ cho họ thao tác bấm vào đâu để dùng dễ dàng hơn (ví dụ: "Bạn có thể vào mục Cộng đồng để viết Confession", hoặc "Vào mục Thư viện để nghe nhạc/tìm bài tập").`;
+        }
+
+        const dynamicModel = genAI.getGenerativeModel({
+            model: 'gemini-2.5-flash',
+            systemInstruction: baseInstruction,
+        });
+
+        // Start chat with history using the dynamically generated model
+        const chat = dynamicModel.startChat({ history });
 
         // Send the user message to get response
         const result = await chat.sendMessage(message);
@@ -117,7 +164,9 @@ export const sendMessage = async (req, res) => {
             // Find the first { and last } to extract JSON if there's noise
             const jsonMatch = responseRaw.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                const jsonStr = jsonMatch[jsonMatch.length - 1]; // Take the last match if there are multiple
+                let jsonStr = jsonMatch[0]; // Take the whole matched block
+                // Clean up any stray markdown inside or around
+                jsonStr = jsonStr.replace(/```json|```/gi, '').trim();
                 parsedResponse = JSON.parse(jsonStr);
             } else {
                 throw new Error('No JSON found');
@@ -125,7 +174,7 @@ export const sendMessage = async (req, res) => {
         } catch (e) {
             console.error('Failed to parse Gemini response:', e.message);
             // Fallback: clean up common markdown noise
-            let cleanResponse = responseRaw.replace(/```json|```/g, '').trim();
+            let cleanResponse = responseRaw.replace(/```json|```/gi, '').trim();
             try {
                 parsedResponse = JSON.parse(cleanResponse);
             } catch (e2) {
@@ -137,7 +186,8 @@ export const sendMessage = async (req, res) => {
                 else if (lowerMsg.includes('buồn') || lowerMsg.includes('tệ') || lowerMsg.includes('khóc')) detectedExpression = 'sad';
                 else if (lowerMsg.includes('hiểu') || lowerMsg.includes('chia sẻ')) detectedExpression = 'empathetic';
 
-                parsedResponse = { content: responseRaw, expression: detectedExpression };
+                // Ensure content is safe for rendering by escaping quotes or just serving plain text
+                parsedResponse = { content: responseRaw.replace(/```json|```|\{|\}/gi, '').trim(), expression: detectedExpression };
             }
         }
 

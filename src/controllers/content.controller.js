@@ -1,5 +1,6 @@
 import Content from '../models/Content.js';
 import User from '../models/User.js';
+import Article from '../models/Article.js';
 
 export const getAllContent = async (req, res) => {
     try {
@@ -12,12 +13,35 @@ export const getAllContent = async (req, res) => {
 
         const contents = await Content.find(query).sort({ createdAt: -1 });
 
-        // Hide contentUrl for premium content if user is not premium (optional UI optimization)
+        // Get all articles in one query (thumbnail + title + _id only)
+        const allArticles = await Article.find({}, { title: 1, thumbnail: 1 });
+        // Build maps for fast lookup
+        const articleByIdMap = {};
+        const articleByTitleMap = {};
+        allArticles.forEach(a => {
+            articleByIdMap[a._id.toString()] = a;
+            if (a.title) articleByTitleMap[a.title.trim().toLowerCase()] = a;
+        });
+
+        // Hide contentUrl for premium content if user is not premium
         const user = await User.findById(req.user._id);
         const isPremiumUser = user.isPremium && (new Date(user.premiumUntil) > new Date());
 
         const sanitizedContents = contents.map(item => {
             const doc = item.toObject();
+
+            // Fallback 1: Use linked article's thumbnail via idArticle
+            if (!doc.thumbnail && doc.idArticle?.type) {
+                const linked = articleByIdMap[doc.idArticle.type.toString()];
+                if (linked?.thumbnail) doc.thumbnail = linked.thumbnail;
+            }
+            // Fallback 2: Match by title similarity
+            if (!doc.thumbnail && doc.title) {
+                const key = doc.title.trim().toLowerCase();
+                const matched = articleByTitleMap[key];
+                if (matched?.thumbnail) doc.thumbnail = matched.thumbnail;
+            }
+
             if (doc.isPremium && !isPremiumUser) {
                 delete doc.contentUrl;
             }

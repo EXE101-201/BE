@@ -45,6 +45,19 @@ export const getAllContent = async (req, res) => {
 
         const data = contents.map(item => {
             const doc = item.toObject();
+
+            // Fallback 1: Use linked article's thumbnail via idArticle
+            if (!doc.thumbnail && doc.idArticle?.type) {
+                const linked = articleByIdMap[doc.idArticle.type.toString()];
+                if (linked?.thumbnail) doc.thumbnail = linked.thumbnail;
+            }
+            // Fallback 2: Match by title similarity
+            if (!doc.thumbnail && doc.title) {
+                const key = doc.title.trim().toLowerCase();
+                const matched = articleByTitleMap[key];
+                if (matched?.thumbnail) doc.thumbnail = matched.thumbnail;
+            }
+
             if (doc.isPremium && !isPremiumUser) {
                 delete doc.contentUrl;
             }

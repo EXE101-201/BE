@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import dns from 'dns';
 
 dotenv.config();
 
@@ -11,6 +12,13 @@ const DB_NAME = process.env.DB_NAME || 'EXE201';
  */
 export async function connectDB() {
     try {
+        // Cố gắng sử dụng Google DNS để tránh lỗi querySrv ECONNREFUSED thường gặp ở VN
+        try {
+            dns.setServers(['8.8.8.8', '8.8.4.4']);
+        } catch (e) {
+            console.warn('Không thể thiết lập custom DNS:', e.message);
+        }
+
         // Kiểm tra MONGODB_URI
         if (!MONGODB_URI || MONGODB_URI.trim() === '') {
             console.error('❌ Lỗi: MONGODB_URI chưa được cấu hình!');

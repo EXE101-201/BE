@@ -19,6 +19,16 @@ export const getAllContent = async (req, res) => {
             Content.countDocuments(query),
         ]);
 
+        // Get all articles in one query (thumbnail + title + _id only)
+        const allArticles = await Article.find({}, { title: 1, thumbnail: 1 });
+        // Build maps for fast lookup
+        const articleByIdMap = {};
+        const articleByTitleMap = {};
+        allArticles.forEach(a => {
+            articleByIdMap[a._id.toString()] = a;
+            if (a.title) articleByTitleMap[a.title.trim().toLowerCase()] = a;
+        });
+
         // Hide contentUrl for premium content if user is not premium
         const user = await User.findById(req.user._id);
         const isPremiumUser = user.isPremium && (new Date(user.premiumUntil) > new Date());

@@ -22,7 +22,7 @@ export const createOrder = async (req, res) => {
             currency: 'VND',
             status: 'process',
             durationDays: 30, // Default to 30 days for now
-            amount: 99000
+            amount: 49000
         });
 
         await newTransaction.save();

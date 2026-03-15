@@ -4,30 +4,46 @@ import Article from '../models/Article.js';
 
 export const getAllContent = async (req, res) => {
     try {
-        const { type } = req.query;
-        let query = {};
+        const { type, page = 1, limit = 6 } = req.query;
+        const pageNum = Math.max(1, parseInt(page));
+        const limitNum = Math.max(1, Math.min(50, parseInt(limit)));
+        const skip = (pageNum - 1) * limitNum;
 
+        let query = {};
         if (type) {
             query.type = type.toUpperCase();
         }
 
-        const contents = await Content.find(query).sort({ createdAt: -1 });
-
-        // Get all articles in one query (thumbnail + title + _id only)
-        const allArticles = await Article.find({}, { title: 1, thumbnail: 1 });
-        // Build maps for fast lookup
-        const articleByIdMap = {};
-        const articleByTitleMap = {};
-        allArticles.forEach(a => {
-            articleByIdMap[a._id.toString()] = a;
-            if (a.title) articleByTitleMap[a.title.trim().toLowerCase()] = a;
-        });
+        const [contents, total] = await Promise.all([
+            Content.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
+            Content.countDocuments(query),
+        ]);
 
         // Hide contentUrl for premium content if user is not premium
         const user = await User.findById(req.user._id);
         const isPremiumUser = user.isPremium && (new Date(user.premiumUntil) > new Date());
 
-        const sanitizedContents = contents.map(item => {
+        // Nếu là ARTICLE: lấy thumbnail từ Article liên kết (1 query duy nhất, tránh N+1)
+        let articleThumbnailMap = {};
+        if (query.type === 'ARTICLE') {
+            const articleIds = contents.map(item =>
+                item.idArticle?._id
+                    ? item.idArticle._id.toString()
+                    : item.idArticle?.toString().replace(/.*'(.+)'.*/, '$1')
+            );
+            console.log(articleIds);
+            if (articleIds.length > 0) {
+                const articles = await Article.find(
+                    { _id: { $in: articleIds } },
+                    { _id: 1, thumbnail: 1 }
+                );
+                articles.forEach(a => {
+                    articleThumbnailMap[a._id.toString()] = a.thumbnail;
+                });
+            }
+        }
+
+        const data = contents.map(item => {
             const doc = item.toObject();
 
             // Fallback 1: Use linked article's thumbnail via idArticle
@@ -45,10 +61,22 @@ export const getAllContent = async (req, res) => {
             if (doc.isPremium && !isPremiumUser) {
                 delete doc.contentUrl;
             }
+            // Nếu là ARTICLE và chưa có thumbnail, lấy từ Article liên kết
+            if (doc.type === 'ARTICLE') {
+                const articleId = doc.idArticle?.toString();
+                if (articleId && articleThumbnailMap[articleId]) {
+                    doc.thumbnail = doc.thumbnail || articleThumbnailMap[articleId];
+                }
+            }
             return doc;
         });
 
-        res.json(sanitizedContents);
+        res.json({
+            data,
+            total,
+            page: pageNum,
+            totalPages: Math.ceil(total / limitNum),
+        });
     } catch (error) {
         console.log(`Lỗi server khi lấy dữ liệu: ${error}`);
         res.status(500).json({ message: 'Lỗi server khi lấy dữ liệu' });

@@ -72,30 +72,16 @@ export const addTransactionCallback = async (req, res) => {
         }
 
         // 2. Extract Transaction ID from content
-        // Expected format: "dh-{transactionId}" or just text containing transactionId if we are loose
-        // User said: "gán nó vào description ... tìm trong collection transaction theo id đó"
-        // Let's look for known pattern. We will use "dh" prefix + 24 hex chars, or maybe just the ID if it's there.
-        // Or simpler: The user script in PaymentPage will put `dh ${transactionId}` or similar.
-        // Let's assume the content contains the transaction ID.
-        // MongoDB ObjectIds are 24 hex characters.
-
-        const match = content.match(/dh\s*([a-fA-F0-9]{24})/);
+        // The description sent usually looks like: {fullName} - stumentalhealth - {transactionId}
+        // Banks might convert to uppercase and remove spaces, but the 24-hex-character MongoDB ObjectId will be preserved.
+        const textToSearch = (content || '') + " " + (description || '');
+        const match = textToSearch.match(/([a-fA-F0-9]{24})/);
 
         let transaction;
 
         if (match) {
             const transactionId = match[1];
             transaction = await Transaction.findById(transactionId);
-        } else {
-            // Fallback for old "auth-" format if needed, or if user put ID directly
-            const oldMatch = content.match(/auth([a-zA-Z0-9]+)/);
-            if (oldMatch) {
-                // handle old logic if necessary, or just ignore. 
-                // For this task, we focus on the new flow.
-                // But let's keep old logic as fallback if we want backward compatibility, 
-                // although the prompt implies a change in flow.
-                // I'll stick to the new requirement.
-            }
         }
 
         if (!transaction) {
